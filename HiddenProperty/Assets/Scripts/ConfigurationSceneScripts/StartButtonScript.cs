@@ -43,7 +43,7 @@ public class StartButtonScript : MonoBehaviour
         TurnPlayerManagerScript.setTotalPlayers(a);
         GameScript.IsInitial = 1;
         GameScript.OnlyPositionList.Clear();
-        GameScript.posVirusTable.Clear();
+        GameScript.posMoneyTable.Clear();
         SceneManager.LoadScene("CheckPlayerScene");
     }
 

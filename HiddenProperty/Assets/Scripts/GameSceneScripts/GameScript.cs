@@ -1,6 +1,7 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
 
 public class GameScript : MonoBehaviour
 {
@@ -11,17 +12,17 @@ public class GameScript : MonoBehaviour
         GROUND,  //  地面
     }
 
-    // ウイルスの種類
-    private enum VirusType
+    // 財産の種類
+    private enum MoneyType
     {
-        VIRUS_1 = 1,
-        VIRUS_2 = 2,
-        VIRUS_3 = 3,
-        VIRUS_4 = 4,
-        VIRUS_5 = 5,
-        VIRUS_6 = 6,
-        VIRUS_7 = 7,
-        VIRUS_8 = 8,
+        Money_1 = 1,
+        Money_2 = 2,
+        Money_3 = 3,
+        Money_4 = 4,
+        Money_5 = 5,
+        Money_6 = 6,
+        Money_7 = 7,
+        Money_8 = 8,
     }
 
     // 方向の種類
@@ -31,11 +32,13 @@ public class GameScript : MonoBehaviour
         RIGHT,  //　右
         DOWN, 　// 下
         LEFT,  // 左
-        ATTACH_VIRUS,  // ウイルスをつける
+        ATTACH_MONEY,  // 財産をつける
     }
 
     private int playerNum = TurnPlayerManagerScript.getTotalPlayers();  // プレイヤーの人数
     public TextAsset stageFile;  // ステージ構造が記述されたテキストファイル
+    public GameObject playerPrefab;
+    public GameObject canvas;
     
     private int rows; // 行数
     private int columns;  // 列数
@@ -45,27 +48,31 @@ public class GameScript : MonoBehaviour
 
     public Sprite groundSprite;  // 地面のスプライト
     public Sprite[] playerSprite;  // プレイヤー1~8のスプライト配列
-    public Sprite[] virusSprite;  // ウイルスに感染した地面のスプライト配列
+    public Sprite[] MoneySprite;  // 財産に感染した地面のスプライト配列
 
     private GameObject[] playerlist = new GameObject [8];  // プレイヤーのゲームオブジェクト
     public static List<Vector2Int> OnlyPositionList = new List<Vector2Int>();
-    private List<ActionType> actionHistoryList = new List<ActionType>();
+    private List<ActionType> actionHistoryList = new List<ActionType>();  // ActionTypeでプレイヤーの行動履歴を残すリスト
+    private Dictionary<Vector2Int, int> OverWrittenPropertyTable = new Dictionary<Vector2Int, int>();  // このターンに上書きされた財産の履歴を残す連想配列
     private Vector2 middleOffset;  // 中心位置
 
-    public static int IsInitial;
-    public GameObject turnPlayer;
+    public static int IsInitial;  // このターンがゲームを開始して、初めてのターンかどうか
+    public GameObject turnPlayer;  // このターンのプレイヤーオブジェクト
 
-    public int countMove;
-    public int countAttachVirus;
-    private int IsSuccessAction;
+    public int countMove;  // このターンに動いた回数
+    public int countAttachMoney;  // このターンに隠した財産の数
+    private int IsSuccessAction;  // 行おうとしたアクションが達成されたかどうか
 
 
-    // 各位置に存在するゲームオブジェクトを管理する連想配列
+    // 各位置に存在する財産を管理する連想配列
     
-    public static Dictionary<Vector2Int, int> posVirusTable = new Dictionary<Vector2Int, int>();
+    public static Dictionary<Vector2Int, int> posMoneyTable = new Dictionary<Vector2Int, int>();
 
     // ゲームプレイヤーの位置を管理する連想配列
     public Dictionary<GameObject, Vector2Int> playerPosTable = new Dictionary<GameObject, Vector2Int>();
+
+    // 見えている財産の位置を管理する連想配列
+    private Dictionary<Vector2Int, GameObject> posMoneyObjectTable = new Dictionary<Vector2Int, GameObject>();
 
 
 
@@ -75,7 +82,7 @@ public class GameScript : MonoBehaviour
     {
         LoadTileData();
         CreateStage();
-        LoadMyVirus();
+        LoadMyMoney();
         if(IsInitial == 1)
         {
             InitialCreatePlayerList();
@@ -89,7 +96,7 @@ public class GameScript : MonoBehaviour
         turnPlayer = playerlist[TurnPlayerManagerScript.getTurnPlayerNum() - 1];
 
         countMove = 0;
-        countAttachVirus = 0;
+        countAttachMoney = 0;
     }
 
     // Update is called once per frame
@@ -157,12 +164,25 @@ public class GameScript : MonoBehaviour
 
     public void OnClickCenterButton()
     {
-        if(1 <= countMove && countMove <= 3 && countAttachVirus == 0)  // 一歩でも歩いていたら
+        if(1 <= countMove && countMove <= 3 && countAttachMoney == 0)  // 一歩でも歩いていたら
         {
             Vector2Int turnPlayerPos;
-            turnPlayerPos = playerPosTable[turnPlayer];
-            AttachVirus(turnPlayerPos, TurnPlayerManagerScript.getTurnPlayerNum());
-            countAttachVirus += 1;
+            IsSuccessAction = 0;
+            int IsPreAttached = 0;
+            // すでに自分が置いた場所には置けないようにする
+            foreach(var pair in posMoneyTable)
+            {
+                if(playerPosTable[turnPlayer] == pair.Key && pair.Value == TurnPlayerManagerScript.getTurnPlayerNum())
+                {
+                    IsPreAttached = 1;
+                }
+            }
+            if(IsPreAttached == 0)
+            {
+                turnPlayerPos = playerPosTable[turnPlayer];
+                AttachMoney(turnPlayerPos, TurnPlayerManagerScript.getTurnPlayerNum());
+                countAttachMoney += 1;
+            }
         }
     }
 
@@ -176,9 +196,30 @@ public class GameScript : MonoBehaviour
         else
         {
             var lastAction = actionHistoryList[NumActionList - 1];
-            if(lastAction == ActionType.ATTACH_VIRUS)
+            if(lastAction == ActionType.ATTACH_MONEY)
             {
-                return;
+                // 隠した財産を取り消す
+                // 他のプレイヤーの財産があったら元に戻す
+                posMoneyTable.Remove(playerPosTable[turnPlayer]);
+                Destroy(posMoneyObjectTable[playerPosTable[turnPlayer]]);
+                posMoneyObjectTable.Remove(playerPosTable[turnPlayer]);
+                int IsOverWritten = 0;
+                foreach(var pair in OverWrittenPropertyTable)
+                {
+                    if(pair.Key == playerPosTable[turnPlayer])
+                    {
+                        // 上書きされたプレイヤーの財産を元に戻す
+                        posMoneyTable.Add(pair.Key, pair.Value);
+                        IsOverWritten = 1;
+                    }
+                }
+                if(IsOverWritten == 1)
+                {
+                    // 履歴リストから元に戻した財産の履歴を削除
+                    OverWrittenPropertyTable.Remove(playerPosTable[turnPlayer]);
+                }
+                countAttachMoney -= 1;
+                actionHistoryList.RemoveAt(NumActionList - 1);
             }
             else
             {
@@ -244,19 +285,20 @@ public class GameScript : MonoBehaviour
         }  
     }
 
-    // 自分のウイルスのタイルをロードする
-    private void LoadMyVirus()
+    // 自分の財産のタイルをロードする
+    private void LoadMyMoney()
     {
         int i = 1;
-        foreach(var pair in posVirusTable)
+        foreach(var pair in posMoneyTable)
         {
             if(pair.Value == TurnPlayerManagerScript.getTurnPlayerNum())
             {
-                GameObject myVirus = new GameObject("myVirus_" + i);
-                var sr = myVirus.AddComponent<SpriteRenderer>();
-                sr.sprite = virusSprite[TurnPlayerManagerScript.getTurnPlayerNum() - 1];
+                GameObject myMoney = new GameObject("myMoney_" + i);
+                posMoneyObjectTable.Add(new Vector2Int(pair.Key.x, pair.Key.y), myMoney);
+                var sr = myMoney.AddComponent<SpriteRenderer>();
+                sr.sprite = MoneySprite[TurnPlayerManagerScript.getTurnPlayerNum() - 1];
                 sr.sortingOrder = 3;
-                myVirus.transform.position = GetDisplayPosition(pair.Key.x, pair.Key.y);
+                myMoney.transform.position = GetDisplayPosition(pair.Key.x, pair.Key.y);
                 i += 1;
                 Debug.Log("aaa" + pair.Key.x);
             }
@@ -268,9 +310,27 @@ public class GameScript : MonoBehaviour
     {
         for(int i = 1; i <= playerNum; i++)
         {
+            GameObject tmpPlayer = Instantiate(playerPrefab) as GameObject;
+
+            tmpPlayer.transform.SetParent(canvas.transform, false);
+
+            // GameObject canvas = tmpPlayer.transform.Find("Canvas").gameObject;
+
+            GameObject playerTag = tmpPlayer.transform.Find("PlayerTag").gameObject;
+
+            Text playerTagText = playerTag.GetComponent<Text>();
+
+            var rectTransform = playerTag.GetComponent<RectTransform>();
+
+            var playerNames =  StartButtonScript.getPlayerDict();
+
+            playerTagText.text = playerNames[i];
+
             var name = "player" + i;
 
-            playerlist[i - 1] = new GameObject(name);
+            tmpPlayer.name = name;
+
+            playerlist[i - 1] = tmpPlayer;
 
             var sr = playerlist[i - 1].AddComponent<SpriteRenderer>();
 
@@ -300,6 +360,8 @@ public class GameScript : MonoBehaviour
             }
             playerlist[i - 1].transform.position = GetDisplayPosition(x, y);
 
+            rectTransform.localPosition = GetNameTagDisplayPosition(x, y);
+
             playerPosTable.Add(playerlist[i-1], new Vector2Int(x, y));
 
             OnlyPositionList.Add(new Vector2Int(x, y));
@@ -312,10 +374,27 @@ public class GameScript : MonoBehaviour
         int i = 1;
         foreach(var pos in OnlyPositionList)
         {
+            GameObject tmpPlayer = Instantiate(playerPrefab) as GameObject;
+
+            tmpPlayer.transform.SetParent(canvas.transform, false);
+
+            // GameObject canvas = tmpPlayer.transform.Find("Canvas").gameObject;
+
+            GameObject playerTag = tmpPlayer.transform.Find("PlayerTag").gameObject;
+
+            playerTag.transform.localPosition = new Vector3(0, 5, 0);
+
+            Text playerTagText = playerTag.GetComponent<Text>();
+
+            var playerNames =  StartButtonScript.getPlayerDict();
+
+            playerTagText.text = playerNames[i];
 
             var name = "player" + i;
 
-            playerlist[i - 1] = new GameObject(name);
+            tmpPlayer.name = name;
+
+            playerlist[i - 1] = tmpPlayer;
 
             var sr = playerlist[i - 1].AddComponent<SpriteRenderer>();
 
@@ -375,11 +454,21 @@ public class GameScript : MonoBehaviour
         y * -tileSize + middleOffset.y + 3
         );
     }
-    /*
-    // 指定された位置に存在するウイルスを返します
-    private GameObject GetVirusAtPosition(Vector2Int pos)
+
+    private Vector3 GetNameTagDisplayPosition(int x, int y)
     {
-        foreach (var pair in virusPosTable)
+        return new Vector3
+        (
+            x * tileSize - middleOffset.x,
+            y * -tileSize + middleOffset.y + 0.5f,
+            0
+        );
+    }
+    /*
+    // 指定された位置に存在する財産を返します
+    private GameObject GetMoneyAtPosition(Vector2Int pos)
+    {
+        foreach (var pair in MoneyPosTable)
         {
             // 指定された位置が見つかった場合
             if(pair.Value == pos)
@@ -432,11 +521,11 @@ public class GameScript : MonoBehaviour
     }
     
     /*
-    // 指定された位置のタイルがウイルスに感染しているならtrueを返す
-    private bool IsVirus(Vector2Int pos)
+    // 指定された位置のタイルが財産に感染しているならtrueを返す
+    private bool IsMoney(Vector2Int pos)
     {
         var cell = tileList[pos.x, pos.y];
-        return (cell == TileType.VIRUS_1) || (cell == TileType.VIRUS_2) || (cell == TileType.VIRUS_3) || (cell == TileType.VIRUS_4);
+        return (cell == TileType.Money_1) || (cell == TileType.Money_2) || (cell == TileType.Money_3) || (cell == TileType.Money_4);
     }
     */
 
@@ -498,38 +587,43 @@ public class GameScript : MonoBehaviour
         return pos;
     }
 
-    // 指定した場所に指定した人のウイルスをつける関数 他のウイルスがある場合は上書きする
-    private void AttachVirus(Vector2Int pos, int playerNum)
+    // 指定した場所に指定した人の財産をつける関数 他の財産がある場合は上書きする
+    private void AttachMoney(Vector2Int pos, int playerNum)
     {
-        int IsSamePosVirus = 0;
-        GameObject attachedVirus;
-        foreach(var pair in posVirusTable)
+        int IsSamePosMoney = 0;
+        GameObject attachedMoney;
+        foreach(var pair in posMoneyTable)
         {
             if(pair.Key == pos)
             {
-                IsSamePosVirus = 1;
+                IsSamePosMoney = 1;
             }
         }
-        if(IsSamePosVirus == 0)
+        if(IsSamePosMoney == 0)
         {
-            posVirusTable.Add(pos, playerNum);
-            attachedVirus = new GameObject("attachedVirus");
-            var sr = attachedVirus.AddComponent<SpriteRenderer>();
-            sr.sprite = virusSprite[playerNum - 1];
+            // 初めて財産が置かれる場合
+            posMoneyTable.Add(pos, playerNum);
+            attachedMoney = new GameObject("attachedMoney");
+            posMoneyObjectTable.Add(pos, attachedMoney);
+            var sr = attachedMoney.AddComponent<SpriteRenderer>();
+            sr.sprite = MoneySprite[playerNum - 1];
             sr.sortingOrder = 3;
-             attachedVirus.transform.position = GetDisplayPosition(pos.x, pos.y);
-             Debug.Log(pos);
+            attachedMoney.transform.position = GetDisplayPosition(pos.x, pos.y);
+            Debug.Log(pos);
             
         }
         else
         {
-            posVirusTable[pos] = playerNum;
-            attachedVirus = new GameObject("attachedVirus");
-            var sr = attachedVirus.AddComponent<SpriteRenderer>();
-            sr.sprite = virusSprite[playerNum - 1];
+            // もともと財産が置かれていた場合
+            OverWrittenPropertyTable.Add(pos, posMoneyTable[pos]);  // もともと置いていた財産の持ち主の情報を履歴に残す
+            posMoneyTable[pos] = playerNum;
+            attachedMoney = new GameObject("attachedMoney");
+            posMoneyObjectTable.Add(pos, attachedMoney);
+            var sr = attachedMoney.AddComponent<SpriteRenderer>();
+            sr.sprite = MoneySprite[playerNum - 1];
             sr.sortingOrder = 3;
-            attachedVirus.transform.position = GetDisplayPosition(pos.x, pos.y);
+            attachedMoney.transform.position = GetDisplayPosition(pos.x, pos.y);
         }
-        actionHistoryList.Add(ActionType.ATTACH_VIRUS);
+        actionHistoryList.Add(ActionType.ATTACH_MONEY);
     }
 }

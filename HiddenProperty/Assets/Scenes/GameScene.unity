@@ -754,6 +754,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   stageFile: {fileID: 4900000, guid: 44cf434aa6c024768b2a3119320938d1, type: 3}
+  playerPrefab: {fileID: 6137564517635113268, guid: 442ef3325b57946babc4e661a1750137,
+    type: 3}
+  canvas: {fileID: 2062031645}
   tileSize: 0.5
   groundSprite: {fileID: 21300000, guid: 972f0af0a91f5498996757ec6c0edd27, type: 3}
   playerSprite:
@@ -765,7 +768,7 @@ MonoBehaviour:
   - {fileID: 21300000, guid: 7521c5f8c1465481ebec573f40fa4fd6, type: 3}
   - {fileID: 21300000, guid: 7521c5f8c1465481ebec573f40fa4fd6, type: 3}
   - {fileID: 21300000, guid: 7521c5f8c1465481ebec573f40fa4fd6, type: 3}
-  virusSprite:
+  MoneySprite:
   - {fileID: 21300000, guid: 8c61dff25237d4be4be6b285e63a5d9a, type: 3}
   - {fileID: 21300000, guid: 8c61dff25237d4be4be6b285e63a5d9a, type: 3}
   - {fileID: 21300000, guid: 8c61dff25237d4be4be6b285e63a5d9a, type: 3}
@@ -776,7 +779,7 @@ MonoBehaviour:
   - {fileID: 21300000, guid: 8c61dff25237d4be4be6b285e63a5d9a, type: 3}
   turnPlayer: {fileID: 0}
   countMove: 0
-  countAttachVirus: 0
+  countAttachMoney: 0
 --- !u!20 &519420031
 Camera:
   m_ObjectHideFlags: 0
