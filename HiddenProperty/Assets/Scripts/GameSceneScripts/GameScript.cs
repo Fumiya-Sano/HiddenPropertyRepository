@@ -39,6 +39,7 @@ public class GameScript : MonoBehaviour
     public TextAsset stageFile;  // ステージ構造が記述されたテキストファイル
     public GameObject playerPrefab;
     public GameObject canvas;
+    public GameObject atonannpo;
     
     private int rows; // 行数
     private int columns;  // 列数
@@ -95,6 +96,10 @@ public class GameScript : MonoBehaviour
         // ターンプレイヤーの取得
         turnPlayer = playerlist[TurnPlayerManagerScript.getTurnPlayerNum() - 1];
 
+        // 初期値はあと3歩に設定
+        Text atotext = atonannpo.GetComponent<Text>();
+        atotext.text = "あと3歩";
+
         countMove = 0;
         countAttachMoney = 0;
     }
@@ -116,6 +121,7 @@ public class GameScript : MonoBehaviour
                 // 行動履歴に行動を追加
                 actionHistoryList.Add(ActionType.UP);
                 countMove += 1;
+                AtoNannteUpdate();
             }
         }
     }
@@ -130,6 +136,7 @@ public class GameScript : MonoBehaviour
             {
                 actionHistoryList.Add(ActionType.RIGHT);
                 countMove += 1;
+                AtoNannteUpdate();
             }
         }
     }
@@ -144,6 +151,7 @@ public class GameScript : MonoBehaviour
             {
                 actionHistoryList.Add(ActionType.DOWN);
                 countMove += 1;
+                AtoNannteUpdate();
             }
         }
     }
@@ -158,6 +166,7 @@ public class GameScript : MonoBehaviour
             {
                 actionHistoryList.Add(ActionType.LEFT);
                 countMove += 1;
+                AtoNannteUpdate();
             }
         }
     }
@@ -221,7 +230,7 @@ public class GameScript : MonoBehaviour
                 countAttachMoney -= 1;
                 actionHistoryList.RemoveAt(NumActionList - 1);
             }
-            else
+            else  // 動きを戻す場合
             {
                 switch(lastAction)
                 {
@@ -229,21 +238,25 @@ public class GameScript : MonoBehaviour
                         TryMovePlayer(ActionType.DOWN, turnPlayer);
                         actionHistoryList.RemoveAt(NumActionList - 1);
                         countMove -= 1;
+                        AtoNannteUpdate();
                         break;
                     case ActionType.RIGHT:
                         TryMovePlayer(ActionType.LEFT, turnPlayer);
                         actionHistoryList.RemoveAt(NumActionList - 1);
                         countMove -= 1;
+                        AtoNannteUpdate();
                         break;
                     case ActionType.DOWN:
                         TryMovePlayer(ActionType.UP, turnPlayer);
                         actionHistoryList.RemoveAt(NumActionList - 1);
                         countMove -= 1;
+                        AtoNannteUpdate();
                         break;
                     case ActionType.LEFT:
                         TryMovePlayer(ActionType.RIGHT, turnPlayer);
                         actionHistoryList.RemoveAt(NumActionList - 1);
                         countMove -= 1;
+                        AtoNannteUpdate();
                         break;
                     default:
                         break;
@@ -252,6 +265,11 @@ public class GameScript : MonoBehaviour
         }
     }
 
+    private void AtoNannteUpdate()
+    {
+        Text atotext = atonannpo.GetComponent<Text>();
+        atotext.text = "あと" + (3 - countMove) + "歩";   
+    }
 
     // タイル情報を読み込む
     private void LoadTileData()
